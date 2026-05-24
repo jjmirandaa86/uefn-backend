@@ -1,3 +1,4 @@
+# Secrets: SSH_KEY, SERVER_IP, GHCR_TOKEN, UEFN_BACKEND_ENV, CERTBOT_EMAIL
 name: CI/CD Deploy Web UEFN-Backend API
 
 on:
@@ -15,6 +16,7 @@ jobs:
 
     env:
       IMAGE: ghcr.io/jjmirandaa86/uefn-backend:latest
+      API_DOMAIN: playface-api.acertijo.dev
 
     steps:
       - name: Checkout
@@ -35,47 +37,45 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_IP }} >> ~/.ssh/known_hosts
 
-      - name: Sync .env from GitHub secret to server
+      - name: Sync .env and deploy scripts to server
         env:
           UEFN_BACKEND_ENV: ${{ secrets.UEFN_BACKEND_ENV }}
         run: |
           if [ -z "$UEFN_BACKEND_ENV" ]; then
             echo "❌ Falta el secret UEFN_BACKEND_ENV"
-            echo "   GitHub → Settings → Secrets → Actions → New repository secret"
-            echo "   Pega el contenido completo de tu archivo .env local"
             exit 1
           fi
           printf '%s\n' "$UEFN_BACKEND_ENV" > /tmp/uefn-backend.env
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} "mkdir -p /app/projects"
-          scp -i ~/.ssh/id_rsa /tmp/uefn-backend.env root@${{ secrets.SERVER_IP }}:/app/projects/.env
-          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} "chmod 600 /app/projects/.env"
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} "mkdir -p /app/projects/uefn-backend/uploads /app/projects/uefn-backend/procesed"
+          scp -i ~/.ssh/id_rsa /tmp/uefn-backend.env root@${{ secrets.SERVER_IP }}:/app/projects/uefn-backend.env
+          scp -i ~/.ssh/id_rsa deploy/run-db-init-if-needed.sh deploy/run-health-check.sh \
+            root@${{ secrets.SERVER_IP }}:/app/projects/uefn-backend/
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} "chmod 600 /app/projects/uefn-backend.env && chmod +x /app/projects/uefn-backend/*.sh"
           rm -f /tmp/uefn-backend.env
-          echo "✅ .env sincronizado en el servidor"
+          echo "✅ .env y scripts sincronizados"
 
-      - name: Deploy to Server
+      - name: Deploy container on droplet
         run: |
           ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} << EOF
-            cd /app/projects || exit 1
-
             set -e
 
             IMAGE=ghcr.io/jjmirandaa86/uefn-backend:latest
-            ENV_FILE=/app/projects/.env
+            ENV_FILE=/app/projects/uefn-backend.env
 
-            echo "🔐 Login to GHCR from droplet..."
+            echo "🔐 Login GHCR..."
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u jjmirandaa86 --password-stdin
 
-            echo "🌐 Creating Docker network if not exists..."
+            echo "🌐 Red app_network..."
             docker network inspect app_network >/dev/null 2>&1 || docker network create app_network
 
-            echo "📦 Pulling image..."
+            echo "📦 Pull imagen..."
             docker pull \$IMAGE
 
-            echo "🛑 Stopping old container..."
+            echo "🛑 Contenedor anterior..."
             docker stop uefn-backend || true
             docker rm uefn-backend || true
 
-            echo "🚀 Running new container..."
+            echo "🚀 Nuevo contenedor uefn-backend..."
             docker run -d \
               --name uefn-backend \
               --network app_network \
@@ -85,5 +85,15 @@ jobs:
               -v /app/projects/uefn-backend/procesed:/app/procesed \
               \$IMAGE
 
-            echo "✅ Deploy completed"
+            echo "✅ Contenedor desplegado"
           EOF
+
+      - name: DB schema init (primera vez)
+        run: |
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} \
+            "bash /app/projects/uefn-backend/run-db-init-if-needed.sh"
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} \
+            "API_DOMAIN='${API_DOMAIN}' bash /app/projects/uefn-backend/run-health-check.sh"
