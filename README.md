@@ -6,12 +6,12 @@ Documento pensado para lectura **académica y clara**: qué hace esta API, cómo
 
 ## 1. Qué es este proyecto
 
-| | |
-| --- | --- |
-| **Nombre** | API REST de MoodVision AI |
-| **Tecnología** | Node.js + Express + MySQL |
-| **Para qué sirve** | Guardar **capturas de emoción** (foto + datos), **historial** en tiempo real, servir **imágenes** y alimentar el frontend y **n8n** |
-| **Frontend asociado** | `uefn-frontend` (dashboard con cámara) |
+|                       |                                                                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Nombre**            | API REST de MoodVision AI                                                                                                           |
+| **Tecnología**        | Node.js + Express + MySQL                                                                                                           |
+| **Para qué sirve**    | Guardar **capturas de emoción** (foto + datos), **historial** en tiempo real, servir **imágenes** y alimentar el frontend y **n8n** |
+| **Frontend asociado** | `uefn-frontend` (dashboard con cámara)                                                                                              |
 
 ```mermaid
 flowchart LR
@@ -73,19 +73,19 @@ Respuesta esperada: `{ "ok": true, "service": "uefn-backend", "database": "conne
 
 ## 4. Rutas principales
 
-| Método | Ruta | Qué hace |
-| ------ | ---- | -------- |
-| `GET` | `/health` | Estado de la API y MySQL |
-| `POST` | `/api/captures` | Sube foto + metadatos de emoción |
-| `GET` | `/api/captures/processed` | Lista para “Momentos divertidos” |
-| `GET` | `/api/captures/new` | Capturas pendientes (n8n) |
-| `PATCH` | `/api/captures/:id/processed` | Marca captura como procesada |
-| `POST` | `/api/history` | Registra emoción en historial (~1/s con cámara) |
-| `GET` | `/api/history/recent` | Historial reciente |
-| `GET` | `/api/history/stats` | Estadísticas agregadas |
-| `GET` | `/api/history/summary/today` | Resumen del día |
-| `GET` | `/api/history/today/by-emotion` | Conteos por emoción hoy |
-| `GET` | `/media/*` | Sirve imágenes de `uploads/` y `procesed/` |
+| Método  | Ruta                            | Qué hace                                        |
+| ------- | ------------------------------- | ----------------------------------------------- |
+| `GET`   | `/health`                       | Estado de la API y MySQL                        |
+| `POST`  | `/api/captures`                 | Sube foto + metadatos de emoción                |
+| `GET`   | `/api/captures/processed`       | Lista para “Momentos divertidos”                |
+| `GET`   | `/api/captures/new`             | Capturas pendientes (n8n)                       |
+| `PATCH` | `/api/captures/:id/processed`   | Marca captura como procesada                    |
+| `POST`  | `/api/history`                  | Registra emoción en historial (~1/s con cámara) |
+| `GET`   | `/api/history/recent`           | Historial reciente                              |
+| `GET`   | `/api/history/stats`            | Estadísticas agregadas                          |
+| `GET`   | `/api/history/summary/today`    | Resumen del día                                 |
+| `GET`   | `/api/history/today/by-emotion` | Conteos por emoción hoy                         |
+| `GET`   | `/media/*`                      | Sirve imágenes de `uploads/` y `procesed/`      |
 
 Más detalle del flujo n8n: carpeta [`n8n/README.md`](./n8n/README.md).
 
@@ -107,18 +107,18 @@ La lógica está en **`config/apiSecurity.js`**. Los números se leen del **`.en
 
 ### 5.2 Unidades de tiempo (importante)
 
-| Variable | Unidad | Ejemplo | Significado |
-| -------- | ------ | ------- | ----------- |
-| `RATE_LIMIT_WINDOW_MS` | **milisegundos** | `60000` | Duración de la ventana = **1 minuto** (60 × 1000 ms) |
-| `RATE_LIMIT_*_MAX` | **peticiones por ventana** | `100` | Máximo **100 requests** en ese minuto (no “por segundo” salvo que cambies la ventana) |
+| Variable               | Unidad                     | Ejemplo | Significado                                                                           |
+| ---------------------- | -------------------------- | ------- | ------------------------------------------------------------------------------------- |
+| `RATE_LIMIT_WINDOW_MS` | **milisegundos**           | `60000` | Duración de la ventana = **1 minuto** (60 × 1000 ms)                                  |
+| `RATE_LIMIT_*_MAX`     | **peticiones por ventana** | `100`   | Máximo **100 requests** en ese minuto (no “por segundo” salvo que cambies la ventana) |
 
 **Regla práctica:** todos los contadores `*_MAX` cuentan peticiones **dentro de la misma ventana** definida por `RATE_LIMIT_WINDOW_MS`.
 
-| `RATE_LIMIT_WINDOW_MS` | Ventana equivalente |
-| ---------------------- | ------------------- |
-| `1000` | 1 segundo |
-| `60000` | 1 minuto (valor por defecto) |
-| `3600000` | 1 hora |
+| `RATE_LIMIT_WINDOW_MS` | Ventana equivalente          |
+| ---------------------- | ---------------------------- |
+| `1000`                 | 1 segundo                    |
+| `60000`                | 1 minuto (valor por defecto) |
+| `3600000`              | 1 hora                       |
 
 **Ejemplo con valores por defecto:**
 
@@ -174,38 +174,38 @@ Las cabeceras HTTP `RateLimit-*` también informan al cliente (estándar de `exp
 
 Copia la sección desde `.env.example`. Cada fila indica **unidad** y **ruta afectada**.
 
-| Variable | Unidad del valor | Default | Ruta / uso |
-| -------- | ---------------- | ------- | ---------- |
-| `RATE_LIMIT_ENABLED` | `true` / `false` | `true` | Activa o desactiva **todos** los límites |
-| `RATE_LIMIT_TRUST_PROXY` | `true` / `false` | `true` | Si hay **nginx** delante, usa la IP real (`X-Forwarded-For`) |
-| `RATE_LIMIT_WINDOW_MS` | **milisegundos** | `60000` (1 min) | Ventana común para todos los contadores |
-| `RATE_LIMIT_WHITELIST_IPS` | IPs separadas por coma | `127.0.0.1,::1` | Sin límite (p. ej. **n8n** en el mismo servidor) |
-| `RATE_LIMIT_GLOBAL_MAX` | peticiones / ventana | `200` | Techo total por IP (casi todas las rutas) |
-| `RATE_LIMIT_HISTORY_POST_MAX` | peticiones / ventana | `100` | `POST /api/history` |
-| `RATE_LIMIT_CAPTURES_POST_MAX` | peticiones / ventana | `18` | `POST /api/captures` |
-| `RATE_LIMIT_CAPTURES_PATCH_MAX` | peticiones / ventana | `60` | `PATCH /api/captures/:id/processed` |
-| `RATE_LIMIT_API_GET_MAX` | peticiones / ventana | `120` | `GET` en `/api/history` y `/api/captures` |
-| `RATE_LIMIT_MEDIA_GET_MAX` | peticiones / ventana | `240` | `GET /media/*` (muchas miniaturas) |
+| Variable                        | Unidad del valor       | Default         | Ruta / uso                                                   |
+| ------------------------------- | ---------------------- | --------------- | ------------------------------------------------------------ |
+| `RATE_LIMIT_ENABLED`            | `true` / `false`       | `true`          | Activa o desactiva **todos** los límites                     |
+| `RATE_LIMIT_TRUST_PROXY`        | `true` / `false`       | `true`          | Si hay **nginx** delante, usa la IP real (`X-Forwarded-For`) |
+| `RATE_LIMIT_WINDOW_MS`          | **milisegundos**       | `60000` (1 min) | Ventana común para todos los contadores                      |
+| `RATE_LIMIT_WHITELIST_IPS`      | IPs separadas por coma | `127.0.0.1,::1` | Sin límite (p. ej. **n8n** en el mismo servidor)             |
+| `RATE_LIMIT_GLOBAL_MAX`         | peticiones / ventana   | `200`           | Techo total por IP (casi todas las rutas)                    |
+| `RATE_LIMIT_HISTORY_POST_MAX`   | peticiones / ventana   | `100`           | `POST /api/history`                                          |
+| `RATE_LIMIT_CAPTURES_POST_MAX`  | peticiones / ventana   | `18`            | `POST /api/captures`                                         |
+| `RATE_LIMIT_CAPTURES_PATCH_MAX` | peticiones / ventana   | `60`            | `PATCH /api/captures/:id/processed`                          |
+| `RATE_LIMIT_API_GET_MAX`        | peticiones / ventana   | `120`           | `GET` en `/api/history` y `/api/captures`                    |
+| `RATE_LIMIT_MEDIA_GET_MAX`      | peticiones / ventana   | `240`           | `GET /media/*` (muchas miniaturas)                           |
 
 ### 5.5 Uso real del frontend vs límites
 
-| Acción del usuario | Frecuencia aproximada | Variable que la protege |
-| ------------------ | --------------------- | ------------------------ |
-| Cámara activa → historial | **~1 POST / segundo** → **~60 / minuto** | `RATE_LIMIT_HISTORY_POST_MAX` (100/min da margen) |
-| Captura automática de foto | cada **≥ 2,5 s** (configurable en frontend) → **≤ ~24 / min** en teoría | `RATE_LIMIT_CAPTURES_POST_MAX` (18/min) |
-| Abrir modales (estadísticas, historial) | ráfagas de **GET** | `RATE_LIMIT_API_GET_MAX` |
-| Galería “Momentos divertidos” | muchas imágenes **GET /media** | `RATE_LIMIT_MEDIA_GET_MAX` |
-| n8n procesa capturas | **PATCH** repetidos | `RATE_LIMIT_CAPTURES_PATCH_MAX` + whitelist IP |
+| Acción del usuario                      | Frecuencia aproximada                                                   | Variable que la protege                           |
+| --------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------- |
+| Cámara activa → historial               | **~1 POST / segundo** → **~60 / minuto**                                | `RATE_LIMIT_HISTORY_POST_MAX` (100/min da margen) |
+| Captura automática de foto              | cada **≥ 2,5 s** (configurable en frontend) → **≤ ~24 / min** en teoría | `RATE_LIMIT_CAPTURES_POST_MAX` (18/min)           |
+| Abrir modales (estadísticas, historial) | ráfagas de **GET**                                                      | `RATE_LIMIT_API_GET_MAX`                          |
+| Galería “Momentos divertidos”           | muchas imágenes **GET /media**                                          | `RATE_LIMIT_MEDIA_GET_MAX`                        |
+| n8n procesa capturas                    | **PATCH** repetidos                                                     | `RATE_LIMIT_CAPTURES_PATCH_MAX` + whitelist IP    |
 
 ### 5.6 Ajustes habituales
 
-| Situación | Qué hacer |
-| --------- | --------- |
-| Desarrollo local y quieres probar sin 429 | `RATE_LIMIT_ENABLED=false` |
-| API detrás de nginx en producción | `RATE_LIMIT_TRUST_PROXY=true` |
-| n8n en el mismo droplet | Añade su IP a `RATE_LIMIT_WHITELIST_IPS` o deja `127.0.0.1` |
-| Varios alumnos en la **misma WiFi** (misma IP pública) | Sube `RATE_LIMIT_HISTORY_POST_MAX` (ej. `150`–`180`) |
-| Quieres límite “por segundo” en vez de por minuto | `RATE_LIMIT_WINDOW_MS=1000` y baja los `*_MAX` (ej. historial `2` = 2 POST/s) |
+| Situación                                              | Qué hacer                                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Desarrollo local y quieres probar sin 429              | `RATE_LIMIT_ENABLED=false`                                                    |
+| API detrás de nginx en producción                      | `RATE_LIMIT_TRUST_PROXY=true`                                                 |
+| n8n en el mismo droplet                                | Añade su IP a `RATE_LIMIT_WHITELIST_IPS` o deja `127.0.0.1`                   |
+| Varios alumnos en la **misma WiFi** (misma IP pública) | Sube `RATE_LIMIT_HISTORY_POST_MAX` (ej. `150`–`180`)                          |
+| Quieres límite “por segundo” en vez de por minuto      | `RATE_LIMIT_WINDOW_MS=1000` y baja los `*_MAX` (ej. historial `2` = 2 POST/s) |
 
 Al arrancar, la consola muestra un resumen:
 
@@ -219,10 +219,10 @@ Para ventana de **1 minuto** (`RATE_LIMIT_WINDOW_MS=60000`):
 
 | Si quieres permitir en promedio… | Pon en `*_MAX` aprox. |
 | -------------------------------- | --------------------- |
-| 1 petición / segundo | `60` |
-| 2 peticiones / segundo | `120` |
-| 1 petición cada 2 segundos | `30` |
-| 1 petición cada 2,5 segundos | `24` |
+| 1 petición / segundo             | `60`                  |
+| 2 peticiones / segundo           | `120`                 |
+| 1 petición cada 2 segundos       | `30`                  |
+| 1 petición cada 2,5 segundos     | `24`                  |
 
 Fórmula:  
 `peticiones_por_minuto ≈ 60 / segundos_entre_cada_petición`
@@ -231,11 +231,11 @@ Fórmula:
 
 ## 6. Fechas y zona horaria (opción 1)
 
-| Concepto | Dónde | Convención |
-| -------- | ----- | ---------- |
-| **Instante exacto** | `fecha_captura` (DATETIME) | Componentes **UTC** (ej. 23:51 del 23 may cuando en Sídney son las 9:51 del 24) |
-| **Día de negocio** | `capture_calendar_day` + carpetas `uploads/` | **YYYY-MM-DD** en `APP_TIMEZONE` (por defecto `Australia/Sydney`) |
-| **Historial “hoy”** | `GET /api/history/...?date=` | Rango UTC del día calendario en Sídney |
+| Concepto            | Dónde                                        | Convención                                                                      |
+| ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Instante exacto** | `fecha_captura` (DATETIME)                   | Componentes **UTC** (ej. 23:51 del 23 may cuando en Sídney son las 9:51 del 24) |
+| **Día de negocio**  | `capture_calendar_day` + carpetas `uploads/` | **YYYY-MM-DD** en `APP_TIMEZONE` (por defecto `Australia/Sydney`)               |
+| **Historial “hoy”** | `GET /api/history/...?date=`                 | Rango UTC del día calendario en Sídney                                          |
 
 ```env
 APP_TIMEZONE=Australia/Sydney
@@ -243,9 +243,9 @@ APP_TIMEZONE=Australia/Sydney
 
 Utilidades compartidas en `utils/appTimezone.js`:
 
-- `calendarDayInAppTz(iso)` — día calendario en Sídney  
-- `toMysqlDatetimeUtc(iso)` — guardar instante en UTC  
-- `dayBoundsUtc('2026-05-24')` — inicio/fin del día para filtros SQL  
+- `calendarDayInAppTz(iso)` — día calendario en Sídney
+- `toMysqlDatetimeUtc(iso)` — guardar instante en UTC
+- `dayBoundsUtc('2026-05-24')` — inicio/fin del día para filtros SQL
 - `resolveAppCalendarDay(date)` — “hoy” o validar `?date=`
 
 Al arrancar, el servidor imprime: `App timezone (día de negocio): Australia/Sydney`.
@@ -256,15 +256,15 @@ Tras actualizar, ejecuta `npm run db:init` una vez para añadir `capture_calenda
 
 ## 7. Otras variables de entorno
 
-| Variable | Descripción |
-| -------- | ----------- |
-| `API_PORT` | Puerto HTTP (ej. `3006`) |
-| `API_URL` | URL pública base (sin puerto si va en proxy) |
-| `APP_TIMEZONE` | Zona IANA para “hoy” y una captura por emoción/día |
-| `CORS_ORIGINS` | Orígenes del frontend permitidos (coma separada) |
-| `DB_*` | Conexión MySQL |
-| `UPLOADS_DIR` / `PROCESSED_DIR` | Carpetas de imágenes |
-| `NEW_ESTADO` / `PROCESSED_ESTADO` | Estados de procesamiento de capturas |
+| Variable                          | Descripción                                        |
+| --------------------------------- | -------------------------------------------------- |
+| `API_PORT`                        | Puerto HTTP (ej. `3006`)                           |
+| `API_URL`                         | URL pública base (sin puerto si va en proxy)       |
+| `APP_TIMEZONE`                    | Zona IANA para “hoy” y una captura por emoción/día |
+| `CORS_ORIGINS`                    | Orígenes del frontend permitidos (coma separada)   |
+| `DB_*`                            | Conexión MySQL                                     |
+| `UPLOADS_DIR` / `PROCESSED_DIR`   | Carpetas de imágenes                               |
+| `NEW_ESTADO` / `PROCESSED_ESTADO` | Estados de procesamiento de capturas               |
 
 ---
 
