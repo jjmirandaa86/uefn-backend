@@ -1,0 +1,427 @@
+{
+  "name": "UEFN - Procesar capturas emocion (OpenAI procesed)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "11111111-1111-4111-8111-111111111101",
+      "name": "Inicio manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cfg-backend-url",
+              "name": "backendUrl",
+              "value": "http://localhost:3006",
+              "type": "string"
+            },
+            {
+              "id": "cfg-backend-root",
+              "name": "backendRoot",
+              "value": "/Users/jjmirandaa86/HD/-developer/2026/uefn-backend",
+              "type": "string"
+            },
+            {
+              "id": "cfg-processed-dir",
+              "name": "processedDir",
+              "value": "procesed",
+              "type": "string"
+            },
+            {
+              "id": "cfg-estado-final",
+              "name": "estadoFinal",
+              "value": "procesado",
+              "type": "string"
+            },
+            {
+              "id": "cfg-openai-model",
+              "name": "openAiImageModel",
+              "value": "gpt-image-1",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111102",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.backendUrl }}/api/captures/new",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111103",
+      "name": "GET capturas nuevo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst res = $input.first().json;\n\nif (!res.ok || !Array.isArray(res.items) || res.items.length === 0) {\n  return [];\n}\n\nreturn res.items.map((capture) => ({\n  json: {\n    ...capture,\n    backendUrl: cfg.backendUrl,\n    backendRoot: cfg.backendRoot,\n    processedDir: cfg.processedDir,\n    estadoFinal: cfg.estadoFinal,\n    openAiImageModel: cfg.openAiImageModel,\n  },\n}));"
+      },
+      "id": "11111111-1111-4111-8111-111111111104",
+      "name": "Expandir items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111105",
+      "name": "Un registro a la vez",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst root = String(item.backendRoot || '').replace(/\\/$/, '');\nconst processedDir = item.processedDir || 'procesed';\n\nconst fc = item.fechaCaptura || item.createdAt || new Date().toISOString();\nconst d = new Date(fc);\nlet dateFolder;\nif (Number.isNaN(d.getTime())) {\n  const now = new Date();\n  dateFolder = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');\n} else {\n  dateFolder = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');\n}\n\nconst originalName = item.nombreArchivo || ('capture-' + item.id + '.png');\nconst ext = (originalName.match(/\\.[^.]+$/) || ['.png'])[0];\nconst base = originalName.replace(/\\.[^.]+$/, '');\nconst outputName = base + '-caricatura' + ext;\n\nconst rutaAlmacenamientoDivertida = processedDir + '/' + dateFolder + '/imagenes/' + outputName;\nconst rutaAbsolutaDivertida = root + '/' + rutaAlmacenamientoDivertida;\n\nconst emocion = item.emocion || 'neutral';\nconst confianza = item.nivelConfianza ?? 0;\n\nconst prompt = 'Procesa esta imagen como caricatura colorida estilo videojuego, con la emocion: ' + emocion + ' y porcentaje de confianza: ' + confianza + '. Manten el rostro reconocible y fondo limpio.';\n\nconst rel = item.rutaAlmacenamiento ? String(item.rutaAlmacenamiento).replace(/\\\\/g, '/') : '';\nconst imageUrl = item.imageUrl || (rel ? item.backendUrl + '/media/' + rel : null);\n\nreturn [{\n  json: {\n    ...item,\n    dateFolder,\n    outputName,\n    prompt,\n    rutaAlmacenamientoDivertida,\n    rutaAbsolutaDivertida,\n    imageUrl,\n    sourceAbsoluta: item.rutaAbsoluta || (root + '/' + rel),\n  },\n}];"
+      },
+      "id": "11111111-1111-4111-8111-111111111106",
+      "name": "Preparar rutas y prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.imageUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "11111111-1111-4111-8111-111111111107",
+      "name": "Descargar imagen original",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/edits",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "={{ $('Preparar rutas y prompt').item.json.openAiImageModel }}"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ $('Preparar rutas y prompt').item.json.prompt }}"
+            },
+            {
+              "name": "size",
+              "value": "1024x1024"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "image[]",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111108",
+      "name": "OpenAI caricatura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Preparar rutas y prompt').first().json;\nconst openAi = $input.first().json;\n\nconst b64 = openAi?.data?.[0]?.b64_json;\nif (!b64) {\n  throw new Error('OpenAI no devolvio b64_json. Respuesta: ' + JSON.stringify(openAi).slice(0, 500));\n}\n\nconst buffer = Buffer.from(b64, 'base64');\n\nreturn [{\n  json: prep,\n  binary: {\n    data: await this.helpers.prepareBinaryData(buffer, prep.outputName, 'image/png'),\n  },\n}];"
+      },
+      "id": "11111111-1111-4111-8111-111111111109",
+      "name": "Decodificar imagen OpenAI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.rutaAbsolutaDivertida }}",
+        "dataPropertyName": "data",
+        "options": {
+          "createDirectories": true
+        }
+      },
+      "id": "11111111-1111-4111-8111-111111111110",
+      "name": "Guardar en procesed",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $json.backendUrl }}/api/captures/{{ $json.id }}/processed",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ estadoProcesamiento: $json.estadoFinal, rutaAlmacenamientoDivertida: $json.rutaAlmacenamientoDivertida, rutaAbsolutaDivertida: $json.rutaAbsolutaDivertida }) }}",
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "PATCH captura procesada",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "11111111-1111-4111-8111-111111111112",
+      "name": "PATCH ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Inicio manual": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "GET capturas nuevo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET capturas nuevo": {
+      "main": [
+        [
+          {
+            "node": "Expandir items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expandir items": {
+      "main": [
+        [
+          {
+            "node": "Un registro a la vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Un registro a la vez": {
+      "main": [
+        [
+          {
+            "node": "Preparar rutas y prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Un registro a la vez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar rutas y prompt": {
+      "main": [
+        [
+          {
+            "node": "Descargar imagen original",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar imagen original": {
+      "main": [
+        [
+          {
+            "node": "OpenAI caricatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI caricatura": {
+      "main": [
+        [
+          {
+            "node": "Decodificar imagen OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decodificar imagen OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Guardar en procesed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar en procesed": {
+      "main": [
+        [
+          {
+            "node": "PATCH captura procesada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH captura procesada": {
+      "main": [
+        [
+          {
+            "node": "PATCH ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PATCH ok?": {
+      "main": [
+        [
+          {
+            "node": "Un registro a la vez",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "22222222-2222-4222-8222-222222222201",
+  "id": "33333333-3333-4333-8333-333333333301"
+}
