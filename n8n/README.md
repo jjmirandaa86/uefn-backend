@@ -2,46 +2,55 @@
 
 ## Importar
 
-1. n8n → **Workflows** → **Import from File**
+1. Abre **https://n8n.acertijo.dev** → **Workflows** → **Import from File**
 2. Archivo: `uefn-process-emotion-captures.json`
+
+## URLs (nodo Config)
+
+| Variable | Producción |
+|----------|------------|
+| `backendUrl` | `https://playface-api.acertijo.dev` |
+| `frontendUrl` | `https://playface.acertijo.dev` |
+| `n8nUrl` | `https://n8n.acertijo.dev` |
+| `backendRoot` | `/app/projects/uefn-backend` (ruta en el servidor para guardar `procesed/`) |
+
+En local, cambia `backendRoot` a tu carpeta del repo `uefn-backend`.
 
 ## Antes de ejecutar
 
 | Paso | Acción |
 |------|--------|
-| 1 | Backend corriendo (`npm start` en `uefn-backend`, puerto 3006) |
-| 2 | En nodo **Config**, ajusta `backendUrl` y `backendRoot` a tu máquina |
-| 3 | En nodo **OpenAI caricatura**, asigna credencial **OpenAI API** (API key con acceso a imágenes) |
-| 4 | n8n debe poder leer/escribir en `backendRoot` (nodo **Guardar en procesed**) |
-| 5 | n8n debe alcanzar `backendUrl` para GET imagen y APIs |
+| 1 | Backend accesible en `backendUrl` |
+| 2 | Credencial **OpenAI API** en el nodo **OpenAI caricatura** |
+| 3 | n8n debe poder escribir en `backendRoot/procesed/` (mismo volumen que `uefn-backend` en el droplet) |
+| 4 | IP de n8n en `RATE_LIMIT_WHITELIST_IPS` del backend (si aplica rate limit) |
 
 ## Flujo
 
 ```
-GET /api/captures/new  →  por cada registro:
-  descargar imagen (uploads vía /media)
-  → OpenAI edición (caricatura + emoción + confianza)
-  → guardar en procesed/{YYYY-MM-DD}/imagenes/
-  → PATCH /api/captures/:id/processed
+GET /api/captures/new (paginado, estado_procesamiento = nuevo)
+  → por cada registro:
+    descargar imagen (imageUrl → /media/...)
+    → OpenAI images/edits (prompt con emocion + nivelConfianza)
+    → guardar en procesed/{fecha}/imagenes/
+    → PATCH /api/captures/:id/processed
+       (estado_procesamiento = procesado, ruta_almacenamiento_divertida, modify_at en servidor)
 ```
 
-## APIs usadas
+## Campos de BD usados
+
+| Campo API | Columna | Uso |
+|-----------|---------|-----|
+| `emocion` | `emocion` | Sustituye `{{ emocion }}` en el prompt |
+| `nivelConfianza` | `nivel_confianza` | Sustituye `{{ porcentaje }}` en el prompt |
+| `rutaAlmacenamiento` | `ruta_almacenamiento` | Origen de la imagen vía `/media/` |
+| `rutaAlmacenamientoDivertida` | `ruta_almacenamiento_divertida` | Ruta de salida tras OpenAI |
+| `estadoProcesamiento` | `estado_procesamiento` | `nuevo` → `procesado` |
+
+## APIs
 
 - `GET /api/captures/new` — filas con `estado_procesamiento = nuevo`
-- `PATCH /api/captures/:id/processed` — actualiza a `procesado` + rutas divertidas (`modifyAt` lo pone el servidor)
-
-## Rutas de archivos
-
-| Carpeta | Uso |
-|---------|-----|
-| `uefn-backend/uploads/{fecha}/` | Imagen original (entrada OpenAI) |
-| `uefn-backend/procesed/{fecha}/imagenes/` | Caricatura generada (salida) |
-
-## OpenAI
-
-- Endpoint: `POST https://api.openai.com/v1/images/edits`
-- Modelo por defecto: `gpt-image-1` (cambiar en **Config** si usas otro)
-- Si falla el multipart, prueba en el nodo cambiar `image[]` por `image`
+- `PATCH /api/captures/:id/processed` — actualiza rutas y estado; `modify_at` lo asigna el backend
 
 ## Programar
 

@@ -7,10 +7,7 @@
       "name": "Inicio manual",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [
-        0,
-        300
-      ]
+      "position": [0, 300]
     },
     {
       "parameters": {
@@ -19,13 +16,31 @@
             {
               "id": "cfg-backend-url",
               "name": "backendUrl",
-              "value": "http://localhost:3006",
+              "value": "https://playface-api.acertijo.dev",
+              "type": "string"
+            },
+            {
+              "id": "cfg-frontend-url",
+              "name": "frontendUrl",
+              "value": "https://playface.acertijo.dev",
+              "type": "string"
+            },
+            {
+              "id": "cfg-n8n-url",
+              "name": "n8nUrl",
+              "value": "https://n8n.acertijo.dev",
               "type": "string"
             },
             {
               "id": "cfg-backend-root",
               "name": "backendRoot",
-              "value": "/Users/jjmirandaa86/HD/-developer/2026/uefn-backend",
+              "value": "/app/projects/uefn-backend",
+              "type": "string"
+            },
+            {
+              "id": "cfg-n8n-files-root",
+              "name": "n8nFilesRoot",
+              "value": "/files",
               "type": "string"
             },
             {
@@ -45,6 +60,12 @@
               "name": "openAiImageModel",
               "value": "gpt-image-1",
               "type": "string"
+            },
+            {
+              "id": "cfg-fetch-limit",
+              "name": "fetchLimit",
+              "value": 50,
+              "type": "number"
             }
           ]
         },
@@ -54,51 +75,17 @@
       "name": "Config",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [
-        220,
-        300
-      ]
+      "position": [220, 300]
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{ $json.backendUrl }}/api/captures/new",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "limit",
-              "value": "50"
-            },
-            {
-              "name": "offset",
-              "value": "0"
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "11111111-1111-4111-8111-111111111103",
-      "name": "GET capturas nuevo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        440,
-        300
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "const cfg = $('Config').first().json;\nconst res = $input.first().json;\n\nif (!res.ok || !Array.isArray(res.items) || res.items.length === 0) {\n  return [];\n}\n\nreturn res.items.map((capture) => ({\n  json: {\n    ...capture,\n    backendUrl: cfg.backendUrl,\n    backendRoot: cfg.backendRoot,\n    processedDir: cfg.processedDir,\n    estadoFinal: cfg.estadoFinal,\n    openAiImageModel: cfg.openAiImageModel,\n  },\n}));"
+        "jsCode": "const cfg = $('Config').first().json;\nconst base = String(cfg.backendUrl || '').replace(/\\/$/, '');\nif (!base) {\n  throw new Error('Config.backendUrl es requerido');\n}\n\nconst limit = Number(cfg.fetchLimit) || 50;\nconst items = [];\nlet offset = 0;\n\nwhile (true) {\n  const res = await this.helpers.httpRequest({\n    method: 'GET',\n    url: `${base}/api/captures/new`,\n    qs: { limit, offset },\n    json: true,\n  });\n\n  if (!res?.ok || !Array.isArray(res.items) || res.items.length === 0) {\n    break;\n  }\n\n  for (const capture of res.items) {\n    items.push({\n      json: {\n        ...capture,\n        backendUrl: base,\n        frontendUrl: cfg.frontendUrl,\n        n8nUrl: cfg.n8nUrl,\n        backendRoot: cfg.backendRoot,\n        n8nFilesRoot: cfg.n8nFilesRoot,\n        processedDir: cfg.processedDir,\n        estadoFinal: cfg.estadoFinal,\n        openAiImageModel: cfg.openAiImageModel,\n      },\n    });\n  }\n\n  const total = res.pagination?.total ?? items.length;\n  offset += limit;\n  if (offset >= total) {\n    break;\n  }\n}\n\nreturn items;"
       },
       "id": "11111111-1111-4111-8111-111111111104",
-      "name": "Expandir items",
+      "name": "Obtener capturas nuevo",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        660,
-        300
-      ]
+      "position": [440, 300]
     },
     {
       "parameters": {
@@ -109,23 +96,17 @@
       "name": "Un registro a la vez",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [
-        880,
-        300
-      ]
+      "position": [660, 300]
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first().json;\nconst root = String(item.backendRoot || '').replace(/\\/$/, '');\nconst processedDir = item.processedDir || 'procesed';\n\nconst fc = item.fechaCaptura || item.createdAt || new Date().toISOString();\nconst d = new Date(fc);\nlet dateFolder;\nif (Number.isNaN(d.getTime())) {\n  const now = new Date();\n  dateFolder = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');\n} else {\n  dateFolder = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');\n}\n\nconst originalName = item.nombreArchivo || ('capture-' + item.id + '.png');\nconst ext = (originalName.match(/\\.[^.]+$/) || ['.png'])[0];\nconst base = originalName.replace(/\\.[^.]+$/, '');\nconst outputName = base + '-caricatura' + ext;\n\nconst rutaAlmacenamientoDivertida = processedDir + '/' + dateFolder + '/imagenes/' + outputName;\nconst rutaAbsolutaDivertida = root + '/' + rutaAlmacenamientoDivertida;\n\nconst emocion = item.emocion || 'neutral';\nconst confianza = item.nivelConfianza ?? 0;\n\nconst prompt = 'Procesa esta imagen como caricatura colorida estilo videojuego, con la emocion: ' + emocion + ' y porcentaje de confianza: ' + confianza + '. Manten el rostro reconocible y fondo limpio.';\n\nconst rel = item.rutaAlmacenamiento ? String(item.rutaAlmacenamiento).replace(/\\\\/g, '/') : '';\nconst imageUrl = item.imageUrl || (rel ? item.backendUrl + '/media/' + rel : null);\n\nreturn [{\n  json: {\n    ...item,\n    dateFolder,\n    outputName,\n    prompt,\n    rutaAlmacenamientoDivertida,\n    rutaAbsolutaDivertida,\n    imageUrl,\n    sourceAbsoluta: item.rutaAbsoluta || (root + '/' + rel),\n  },\n}];"
+        "jsCode": "const PROMPT_TEMPLATE = `Create a highly detailed cartoon-style portrait based on a real selfie photo. Preserve the person's real identity, facial structure, skin tone, hairstyle, and main facial features, but exaggerate the detected emotion in a humorous and expressive cartoon way.\\n\\nEmotion detected: {{ emocion }}\\nConfidence level: {{ porcentaje }}\\n\\nApply the emotional intensity according to the confidence percentage:\\n- 0–40% → subtle emotion\\n- 41–70% → noticeable emotion\\n- 71–100% → highly exaggerated emotional expression\\n\\nSupported emotions:\\n- Happiness\\n- Sadness\\n- Anger\\n- Surprise\\n- Fear\\n- Disgust\\n\\nEmotion behavior rules:\\n\\nHappiness:\\n- Big smile\\n- Bright eyes\\n- Cheerful expression\\n- Comic hearts, stars, sparkles\\n\\nSadness:\\n- Tears\\n- Pouty lips\\n- Sad eyebrows\\n- Rain cloud, dramatic mood\\n\\nAnger:\\n- Red face tones\\n- Angry eyebrows\\n- Steam/smoke effects\\n- Intense expression lines\\n\\nSurprise:\\n- Wide open eyes\\n- Open mouth\\n- Shock lines\\n- Dynamic comic effects\\n\\nFear:\\n- Nervous eyes\\n- Sweat drops\\n- Pale tones\\n- Tension effects\\n\\nDisgust:\\n- Scrunched nose\\n- Uneasy expression\\n- Greenish comic accents\\n- Reaction lines\\n\\nVisual Style:\\n- Semi-realistic cartoon\\n- Pixar + comic illustration mix\\n- High detail skin texture\\n- Expressive emotional caricature\\n- Cinematic lighting\\n- Clean soft background\\n- Funny but visually appealing\\n- Ultra detailed\\n- 4K digital illustration\\n\\nImportant:\\n- Keep the person recognizable\\n- Do not completely distort the face\\n- Preserve realism while exaggerating emotion\\n- Add comic/cartoon effects matching the emotion\\n- Emotion intensity must reflect the confidence percentage`;\n\nconst item = $input.first().json;\nconst n8nFilesRoot = String(item.n8nFilesRoot || '/files').replace(/\\/$/, '');\nconst processedDir = item.processedDir || 'procesed';\nconst apiBase = String(item.backendUrl || '').replace(/\\/$/, '');\n\nconst fc = item.fechaCaptura || item.createdAt || new Date().toISOString();\nconst d = new Date(fc);\nlet dateFolder;\nif (Number.isNaN(d.getTime())) {\n  const now = new Date();\n  dateFolder = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');\n} else {\n  dateFolder = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');\n}\n\nconst originalName = item.nombreArchivo || ('capture-' + item.id + '.png');\nconst ext = (originalName.match(/\\.[^.]+$/) || ['.png'])[0];\nconst baseName = originalName.replace(/\\.[^.]+$/, '');\nconst outputName = baseName + '-caricatura' + ext;\n\n// Ruta que guardas en BD/backend, relativa a tu carpeta pública del backend\nconst rutaAlmacenamientoDivertida = processedDir + '/' + dateFolder + '/' + outputName;\n\n// Ruta real dentro del contenedor n8n. /files está montado hacia:\n// /app/projects/uefn-backend/procesed en el Droplet\nconst rutaAbsolutaDivertida = n8nFilesRoot + '/' + dateFolder + '/' + outputName;\n\nconst emocion = String(item.emocion || 'neutral').trim();\nconst porcentaje = item.nivelConfianza ?? 0;\n\nconst prompt = PROMPT_TEMPLATE\n  .replace(/\\{\\{\\s*emocion\\s*\\}\\}/gi, emocion)\n  .replace(/\\{\\{\\s*porcentaje\\s*\\}\\}/gi, String(porcentaje));\n\nconst rel = item.rutaAlmacenamiento ? String(item.rutaAlmacenamiento).replace(/\\\\/g, '/') : '';\nconst imageUrl = item.imageUrl || (rel ? apiBase + '/media/' + rel : null);\n\nif (!imageUrl) {\n  throw new Error('Captura ' + item.id + ' sin ruta_almacenamiento / imageUrl');\n}\n\nreturn [{\n  json: {\n    ...item,\n    dateFolder,\n    outputName,\n    prompt,\n    emocion,\n    porcentaje,\n    rutaAlmacenamientoDivertida,\n    rutaAbsolutaDivertida,\n    imageUrl,\n  },\n}];"
       },
       "id": "11111111-1111-4111-8111-111111111106",
       "name": "Preparar rutas y prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1100,
-        300
-      ]
+      "position": [880, 300]
     },
     {
       "parameters": {
@@ -142,10 +123,7 @@
       "name": "Descargar imagen original",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1320,
-        300
-      ]
+      "position": [1100, 300]
     },
     {
       "parameters": {
@@ -182,10 +160,7 @@
       "name": "OpenAI caricatura",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1540,
-        300
-      ]
+      "position": [1320, 300]
     },
     {
       "parameters": {
@@ -195,10 +170,7 @@
       "name": "Decodificar imagen OpenAI",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1760,
-        300
-      ]
+      "position": [1540, 300]
     },
     {
       "parameters": {
@@ -213,28 +185,22 @@
       "name": "Guardar en procesed",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1,
-      "position": [
-        1980,
-        300
-      ]
+      "position": [1760, 300]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ $json.backendUrl }}/api/captures/{{ $json.id }}/processed",
+        "url": "={{ $('Preparar rutas y prompt').item.json.backendUrl }}/api/captures/{{ $('Preparar rutas y prompt').item.json.id }}/processed",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ estadoProcesamiento: $json.estadoFinal, rutaAlmacenamientoDivertida: $json.rutaAlmacenamientoDivertida, rutaAbsolutaDivertida: $json.rutaAbsolutaDivertida }) }}",
+        "jsonBody": "={{ JSON.stringify({ estadoProcesamiento: $('Preparar rutas y prompt').item.json.estadoFinal, rutaAlmacenamientoDivertida: $('Preparar rutas y prompt').item.json.rutaAlmacenamientoDivertida }) }}",
         "options": {}
       },
       "id": "11111111-1111-4111-8111-111111111111",
       "name": "PATCH captura procesada",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        2200,
-        300
-      ]
+      "position": [1980, 300]
     },
     {
       "parameters": {
@@ -263,10 +229,7 @@
       "name": "PATCH ok?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [
-        2420,
-        300
-      ]
+      "position": [2200, 300]
     }
   ],
   "connections": {
@@ -285,25 +248,14 @@
       "main": [
         [
           {
-            "node": "GET capturas nuevo",
+            "node": "Obtener capturas nuevo",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "GET capturas nuevo": {
-      "main": [
-        [
-          {
-            "node": "Expandir items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Expandir items": {
+    "Obtener capturas nuevo": {
       "main": [
         [
           {
@@ -422,6 +374,6 @@
     "templateCredsSetupCompleted": false
   },
   "active": false,
-  "versionId": "22222222-2222-4222-8222-222222222201",
+  "versionId": "22222222-2222-4222-8222-222222222202",
   "id": "33333333-3333-4333-8333-333333333301"
 }
