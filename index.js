@@ -1,6 +1,7 @@
 import "dotenv/config";
 import cors from "cors";
 import express from "express";
+import helmet from "helmet";
 import { ensureSchema } from "./db/ensureSchema.js";
 import { pingDatabase } from "./db/pool.js";
 import capturesRouter from "./routes/captures.routes.js";
@@ -68,14 +69,11 @@ app.use(
 );
 
 app.use(apiSecurity.globalMiddleware);
+app.use(helmet());
 
 //---- Routes
 app.use(systemRouter); //Health check
-app.use(
-  "/media",
-  apiSecurity.mediaMiddleware,
-  createMediaMiddleware(),
-); //Serve uploads and processed under /media/* (e.g. imageUrl of captures); short cache on images.
+app.use("/media", apiSecurity.mediaMiddleware, createMediaMiddleware()); //Serve uploads and processed under /media/* (e.g. imageUrl of captures); short cache on images.
 app.use("/api/captures", apiSecurity.capturesMiddleware, capturesRouter);
 app.use("/api/history", apiSecurity.historyMiddleware, historyRouter);
 app.use(errorHandler); //Handle Errors
