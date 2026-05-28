@@ -15,12 +15,10 @@ const router = express.Router();
 router.get("/health", async (_req, res) => {
   try {
     await pingDatabase();
-    res.json({ ok: true, service: "uefn-backend", database: "connected" });
+    res.json({ ok: true });
   } catch (e) {
     res.status(503).json({
       ok: false,
-      service: "uefn-backend",
-      database: "disconnected",
       error: e.message,
     });
   }

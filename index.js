@@ -44,6 +44,8 @@ function isLanDevOrigin(origin) {
 }
 
 const app = express();
+app.disable("x-powered-by");
+app.use(helmet());
 
 const apiSecurity = setupApiSecurity(app);
 
@@ -69,7 +71,6 @@ app.use(
 );
 
 app.use(apiSecurity.globalMiddleware);
-app.use(helmet());
 
 //---- Routes
 app.use(systemRouter); //Health check
