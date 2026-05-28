@@ -75,6 +75,12 @@ jobs:
             docker stop uefn-backend || true
             docker rm uefn-backend || true
 
+            if ! docker ps --format '{{.Names}}' | grep -qx mysql; then
+              echo "❌ Contenedor mysql no está en ejecución. Despliega mysql-droplets primero."
+              docker ps --format 'table {{.Names}}\t{{.Status}}'
+              exit 1
+            fi
+
             echo "🚀 Nuevo contenedor uefn-backend..."
             docker run -d \
               --name uefn-backend \
@@ -85,6 +91,9 @@ jobs:
               -v /app/projects/uefn-backend/procesed:/app/procesed \
               \$IMAGE
 
+            echo "Variables críticas en el contenedor:"
+            docker exec uefn-backend printenv DB_HOST DB_PORT DB_USER DB_NAME API_PORT NODE_ENV 2>/dev/null || true
+
             echo "✅ Contenedor desplegado"
           EOF
 
@@ -93,3 +102,8 @@ jobs:
           ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=12 -o ConnectTimeout=30 \
             -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} \
             "bash /app/projects/uefn-backend/run-db-init-if-needed.sh"
+
+      - name: Health check
+        run: |
+          ssh -i ~/.ssh/id_rsa root@${{ secrets.SERVER_IP }} \
+            "API_DOMAIN='${API_DOMAIN}' bash /app/projects/uefn-backend/run-health-check.sh"

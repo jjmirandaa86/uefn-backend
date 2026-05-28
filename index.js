@@ -4,6 +4,7 @@ import express from "express";
 import helmet from "helmet";
 import { ensureSchema } from "./db/ensureSchema.js";
 import { pingDatabase } from "./db/pool.js";
+import { waitForMysql } from "./db/waitForMysql.js";
 import capturesRouter from "./routes/captures.routes.js";
 import historyRouter from "./routes/history.routes.js";
 import systemRouter, {
@@ -105,10 +106,11 @@ app.use(errorHandler);
 
 //---- Start API
 async function start() {
+  await waitForMysql();
   await ensureSchema();
   await pingDatabase();
 
-  app.listen(port, () => {
+  app.listen(port, "0.0.0.0", () => {
     console.log(`API listening at ${getPublicApiUrl()}`);
     console.log(`App timezone (día de negocio): ${getAppTimezone()}`);
 
