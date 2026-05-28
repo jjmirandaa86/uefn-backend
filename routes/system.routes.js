@@ -33,6 +33,7 @@ export function createMediaMiddleware() {
     setHeaders(res, filePath) {
       if (/\.(png|jpe?g|webp|gif)$/i.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=300");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       }
     },
   });

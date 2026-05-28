@@ -72,7 +72,12 @@ const app = express();
 
 app.disable("x-powered-by");
 
-app.use(helmet());
+// Imágenes /media/* se muestran en <img> desde otro subdominio (playface → playface-api).
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 
 const apiSecurity = setupApiSecurity(app);
 
